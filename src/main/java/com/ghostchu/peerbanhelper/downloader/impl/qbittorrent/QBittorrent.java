@@ -51,8 +51,8 @@ public class QBittorrent extends AbstractDownloader {
             return size() > 2000;
         }
     };
-    private final ExecutorService isPrivateExecutorService = Executors.newFixedThreadPool(30); // Controls the number of concurrent API requests
-    private final Semaphore isPrivateSemaphore = new Semaphore(15); // Limits the concurrent access to 5
+    private final ExecutorService isPrivateExecutorService = Executors.newFixedThreadPool(10); // Controls the number of concurrent API requests
+    private final Semaphore isPrivateSemaphore = new Semaphore(5); // Limits the concurrent access to 5
 
     public QBittorrent(String name, Config config) {
         super(name);
