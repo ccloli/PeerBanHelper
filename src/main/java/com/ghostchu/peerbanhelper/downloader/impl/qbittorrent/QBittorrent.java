@@ -166,14 +166,13 @@ public class QBittorrent extends AbstractDownloader {
         }
         List<QBTorrent> qbTorrent = JsonUtil.getGson().fromJson(request.body(), new TypeToken<List<QBTorrent>>() {
         }.getType());
-        List<Torrent> torrents = new ArrayList<>();
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        List<CompletableFuture<QBTorrent>> futures = new ArrayList<>();
         long startTime = System.currentTimeMillis();
 
         for (QBTorrent detail : qbTorrent) {
             if (config.isIgnorePrivate()) {
-                if (detail.getPrivateTorrent() == null) {
-                    futures.add(CompletableFuture.runAsync(() -> {
+                CompletableFuture<QBTorrent> future = CompletableFuture.supplyAsync(() -> {
+                    if (detail.getPrivateTorrent() == null) {
                         try {
                             isPrivateSemaphore.acquire();
                             checkAndSetPrivateField(detail);
@@ -182,24 +181,31 @@ public class QBittorrent extends AbstractDownloader {
                         } finally {
                             isPrivateSemaphore.release();
                         }
-                    }, isPrivateExecutorService));
-                } else if (detail.getPrivateTorrent()) {
-                    continue;
-                }
+                    }
+                    return detail;
+                }, isPrivateExecutorService);
+                futures.add(future);
+            } else {
+                futures.add(CompletableFuture.completedFuture(detail));
             }
-
-            torrents.add(new TorrentImpl(detail.getHash(), detail.getName(), detail.getHash(), detail.getTotalSize(),
-                    detail.getProgress(), detail.getUpspeed(), detail.getDlspeed(),
-                    detail.getPrivateTorrent() != null && detail.getPrivateTorrent()));
         }
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-
-        // 在需要异步获取 isPrivate 状态时会直接插入列表中，因此需要重新过滤一次
-        torrents = torrents.stream()
-            .filter(t -> !(config.isIgnorePrivate() && t.isPrivate()))
+        List<Torrent> torrents = futures.stream()
+            .map(future -> {
+                try {
+                    return future.get();
+                } catch (Exception e) {
+                    return null;
+                }
+            })
+            .filter(Objects::nonNull)
+            .filter(detail -> !(config.isIgnorePrivate() && detail.getPrivateTorrent() != null && detail.getPrivateTorrent()))
+            .map(detail -> new TorrentImpl(detail.getHash(), detail.getName(), detail.getHash(), detail.getTotalSize(),
+                    detail.getProgress(), detail.getUpspeed(), detail.getDlspeed(),
+                    detail.getPrivateTorrent() != null && detail.getPrivateTorrent()))
             .collect(Collectors.toList());
-        
+
         long endTime = System.currentTimeMillis();
         log.info("Torrents time cost: {}ms", endTime - startTime);
         return torrents;
