@@ -156,7 +156,7 @@ public class QBittorrent extends AbstractDownloader {
     public List<Torrent> getTorrents() {
         HttpResponse<String> request;
         try {
-            request = httpClient.send(MutableRequest.GET(apiEndpoint + "/torrents/info?filter=active"), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            request = httpClient.send(MutableRequest.GET(apiEndpoint + "/torrents/info"), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -204,7 +204,7 @@ public class QBittorrent extends AbstractDownloader {
         }
 
         try {
-            log.debug("Field is_private is not present and cache miss, query from properties api, hash: {}", hash);
+            log.info("Field is_private is not present and cache miss, query from properties api, hash: {}", hash);
             HttpResponse<String> res = httpClient.send(
                     MutableRequest.GET(apiEndpoint + "/torrents/properties?hash=" + hash),
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
