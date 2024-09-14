@@ -35,6 +35,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import static com.ghostchu.peerbanhelper.text.TextManager.tlUI;
 
@@ -193,6 +194,12 @@ public class QBittorrent extends AbstractDownloader {
         }
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        // 在需要异步获取 isPrivate 状态时会直接插入列表中，因此需要重新过滤一次
+        torrents = torrents.stream()
+            .filter(t -> !(config.isIgnorePrivate() && t.isPrivate()))
+            .collect(Collectors.toList());
+        
         long endTime = System.currentTimeMillis();
         log.info("Torrents time cost: {}ms", endTime - startTime);
         return torrents;
