@@ -167,6 +167,7 @@ public class QBittorrent extends AbstractDownloader {
         }.getType());
         List<Torrent> torrents = new ArrayList<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
+        long startTime = System.currentTimeMillis();
 
         for (QBTorrent detail : qbTorrent) {
             if (config.isIgnorePrivate()) {
@@ -192,6 +193,8 @@ public class QBittorrent extends AbstractDownloader {
         }
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        long endTime = System.currentTimeMillis();
+        log.info("Torrents time cost: {}ms", endTime - startTime);
         return torrents;
     }
 
