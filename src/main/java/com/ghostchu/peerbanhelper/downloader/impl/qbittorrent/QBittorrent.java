@@ -170,17 +170,15 @@ public class QBittorrent extends AbstractDownloader {
         long startTime = System.currentTimeMillis();
 
         for (QBTorrent detail : qbTorrent) {
-            if (config.isIgnorePrivate()) {
+            if (config.isIgnorePrivate() && detail.getPrivateTorrent() == null) {
                 CompletableFuture<QBTorrent> future = CompletableFuture.supplyAsync(() -> {
-                    if (detail.getPrivateTorrent() == null) {
-                        try {
-                            isPrivateSemaphore.acquire();
-                            checkAndSetPrivateField(detail);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        } finally {
-                            isPrivateSemaphore.release();
-                        }
+                    try {
+                        isPrivateSemaphore.acquire();
+                        checkAndSetPrivateField(detail);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        isPrivateSemaphore.release();
                     }
                     return detail;
                 }, isPrivateExecutorService);
