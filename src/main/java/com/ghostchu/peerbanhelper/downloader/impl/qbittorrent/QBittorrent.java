@@ -1,5 +1,6 @@
 package com.ghostchu.peerbanhelper.downloader.impl.qbittorrent;
 
+import com.ghostchu.peerbanhelper.Main;
 import com.ghostchu.peerbanhelper.downloader.AbstractDownloader;
 import com.ghostchu.peerbanhelper.downloader.DownloaderLoginResult;
 import com.ghostchu.peerbanhelper.downloader.DownloaderStatistics;
@@ -47,9 +48,7 @@ public class QBittorrent extends AbstractDownloader {
     private final HttpClient httpClient;
     private final Config config;
 
-    private final Cache<String, Boolean> isPrivateCache = CacheBuilder.newBuilder()
-        .maximumSize(2000)
-        .build();
+    private final Cache<String, Boolean> isPrivateCache;
     private final ExecutorService isPrivateExecutorService = Executors.newVirtualThreadPerTaskExecutor();
     private final Semaphore isPrivateSemaphore = new Semaphore(5);
 
@@ -79,6 +78,15 @@ public class QBittorrent extends AbstractDownloader {
             builder.sslContext(HTTPUtil.getIgnoreSslContext());
         }
         this.httpClient = builder.build();
+
+        YamlConfiguration profileConfig = Main.getProfileConfig();
+        this.isPrivateCache = CacheBuilder.newBuilder()
+            .maximumSize(2000)
+            .expireAfterAccess(
+                profileConfig.getLong("check-interval", 5000) + (1000 * 60),
+                TimeUnit.MILLISECONDS
+            )
+            .build();
     }
 
     public static QBittorrent loadFromConfig(String name, JsonObject section) {
@@ -173,9 +181,10 @@ public class QBittorrent extends AbstractDownloader {
                 CompletableFuture<QBTorrent> future = CompletableFuture.supplyAsync(() -> {
                     try {
                         isPrivateSemaphore.acquire();
-                        checkAndSetPrivateField(detail);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+                        String hash = detail.getHash();
+                        detail.setPrivateTorrent(isPrivateCache.get(hash, () -> fetchPrivateStatus(hash)));
+                    } catch (Exception e) {
+                        log.debug("Failed to load private cache", e);
                     } finally {
                         isPrivateSemaphore.release();
                     }
@@ -208,14 +217,7 @@ public class QBittorrent extends AbstractDownloader {
         return torrents;
     }
 
-    private void checkAndSetPrivateField(QBTorrent detail) {
-        String hash = detail.getHash();
-        Boolean isPrivate = isPrivateCache.getIfPresent(hash);
-        if (isPrivate != null || isPrivateCache.asMap().containsKey(hash)) {
-            detail.setPrivateTorrent(isPrivate);
-            return;
-        }
-
+    private Boolean fetchPrivateStatus(String hash) {
         try {
             log.debug("Field is_private is not present and cache miss, query from properties api, hash: {}", hash);
             HttpResponse<String> res = httpClient.send(
@@ -224,16 +226,15 @@ public class QBittorrent extends AbstractDownloader {
             );
             if (res.statusCode() == 200) {
                 QBTorrent newDetail = JsonUtil.getGson().fromJson(res.body(), QBTorrent.class);
-                isPrivate = newDetail.getPrivateTorrent();
-                // turn off cache and don't return to measure performance
-                // isPrivateCache.put(hash, isPrivate);
-                // detail.setPrivateTorrent(isPrivate);
+                Boolean isPrivate = newDetail.getPrivateTorrent();
+                return isPrivate;
             } else {
                 log.warn("Error fetching properties for torrent hash: {}, status: {}", hash, res.statusCode());
             }
         } catch (Exception e) {
             log.warn("Error fetching properties for torrent hash: {}", hash, e);
         }
+        return null;
     }
 
     @Override
@@ -333,8 +334,7 @@ public class QBittorrent extends AbstractDownloader {
 
     @Override
     public void close() throws Exception {
-        isPrivateExecutorService.shutdown();
-        if (!isPrivateExecutorService.awaitTermination(10, TimeUnit.SECONDS)) {
+        if (!isPrivateExecutorService.isShutdown()) {
             isPrivateExecutorService.shutdownNow();
         }
     }
