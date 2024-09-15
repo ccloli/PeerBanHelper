@@ -110,7 +110,10 @@ public class Main {
         log.info("Current system language tag: {}", Locale.getDefault().toLanguageTag());
         DEF_LOCALE = mainConfig.getString("language");
         if (DEF_LOCALE == null || DEF_LOCALE.equalsIgnoreCase("default")) {
-            DEF_LOCALE = Locale.getDefault().toLanguageTag();
+            DEF_LOCALE = System.getenv("PBH_USER_LOCALE");
+            if(DEF_LOCALE == null) {
+                DEF_LOCALE = Locale.getDefault().toLanguageTag();
+            }
         }
         DEF_LOCALE = DEF_LOCALE.toLowerCase(Locale.ROOT).replace("-", "_");
         initGUI(args);
@@ -118,6 +121,7 @@ public class Main {
         pbhServerAddress = mainConfig.getString("server.prefix", "http://127.0.0.1:" + mainConfig.getInt("server.http"));
         setupProxySettings();
         try {
+            log.info("Loading application context, this may need a while on low-end devices, please wait...");
             applicationContext = new AnnotationConfigApplicationContext();
             applicationContext.register(AppConfig.class);
             applicationContext.refresh();
