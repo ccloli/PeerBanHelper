@@ -225,8 +225,9 @@ public class QBittorrent extends AbstractDownloader {
             if (res.statusCode() == 200) {
                 QBTorrent newDetail = JsonUtil.getGson().fromJson(res.body(), QBTorrent.class);
                 isPrivate = newDetail.getPrivateTorrent();
-                isPrivateCache.put(hash, isPrivate);
-                detail.setPrivateTorrent(isPrivate);
+                // turn off cache and don't return to measure performance
+                // isPrivateCache.put(hash, isPrivate);
+                // detail.setPrivateTorrent(isPrivate);
             } else {
                 log.warn("Error fetching properties for torrent hash: {}, status: {}", hash, res.statusCode());
             }
