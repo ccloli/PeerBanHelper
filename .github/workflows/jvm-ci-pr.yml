@@ -19,8 +19,6 @@ jobs:
         with:
           name: webui-dist
           path: src/main/resources/static
-      - name: Display structure of WebUI dist
-        run: ls src/main/resources/static
       - uses: actions/setup-java@v4
         with:
           distribution: "temurin"
@@ -32,7 +30,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PullRequest-Artifact-${{ github.sha }}
+          name: maven-dist
           path: |
             target/*.jar
             target/peerbanhelper-binary
